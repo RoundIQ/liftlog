@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Lift Log</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#0e0e0e; --bg2:#161616; --bg3:#1e1e1e;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+  --text:#f0f0f0; --muted:#777;
+  --orange:#e8601b; --green:#22c55e; --blue:#3b82f6;
+  --green2:rgba(34,197,94,0.1);
+  --radius:14px; --radius-sm:8px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{overflow-x:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;width:100%;}
+
+/* ── Topbar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:0.5px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:30;width:100%;}
+.logo{font-size:17px;font-weight:600;letter-spacing:-0.3px;}
+.logo span{color:var(--orange);}
+.export-btn{background:var(--orange);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 13px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;}
+.export-btn:active{opacity:.75;}
+
+/* ── Day bar ── */
+.day-bar-wrap{border-bottom:0.5px solid var(--border);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;width:100%;}
+.day-bar-wrap::-webkit-scrollbar{display:none;}
+.day-bar{display:flex;gap:6px;padding:10px 16px;width:max-content;min-width:100%;justify-content:center;}
+.day-pill{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 14px;border-radius:100px;border:0.5px solid var(--border2);background:var(--bg2);cursor:pointer;transition:all .15s;flex-shrink:0;}
+.day-pill.active{background:var(--orange);border-color:var(--orange);}
+.day-pill.rest-day{border-style:dashed;}
+.dp-label{font-size:10px;font-weight:500;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.07em;}
+.dp-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;}
+.day-pill.active .dp-label,.day-pill.active .dp-name{color:#fff;}
+
+/* ── Content ── */
+.content{padding:16px;width:100%;overflow-x:hidden;padding-bottom:90px;}
+
+/* ── Day header ── */
+.day-header{margin-bottom:16px;}
+.day-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;}
+.day-title{font-size:20px;font-weight:600;letter-spacing:-0.3px;line-height:1.2;}
+.day-accent{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;flex-shrink:0;vertical-align:middle;}
+.day-tag{font-size:12px;color:var(--muted);}
+.complete-badge{display:flex;align-items:center;gap:4px;background:var(--green2);border:0.5px solid rgba(34,197,94,.25);color:var(--green);font-size:11px;font-weight:500;padding:4px 10px;border-radius:100px;white-space:nowrap;flex-shrink:0;}
+
+/* ── Section dividers ── */
+.sec-div{display:flex;align-items:center;gap:10px;margin:18px 0 10px;}
+.sec-div-line{height:0.5px;flex:1;}
+.sec-div-label{font-size:10px;font-weight:600;letter-spacing:.12em;font-family:'DM Mono',monospace;text-transform:uppercase;flex-shrink:0;}
+.sec-div.lifts .sec-div-line{background:rgba(232,96,27,.25);}
+.sec-div.lifts .sec-div-label{color:var(--orange);}
+.sec-div.core .sec-div-line{background:rgba(34,197,94,.25);}
+.sec-div.core .sec-div-label{color:var(--green);}
+.sec-div.warmup .sec-div-line{background:rgba(251,191,36,.2);}
+.sec-div.warmup .sec-div-label{color:#fbbf24;}
+.ex-card.warmup-card{border-color:rgba(251,191,36,.15);}
+.ex-card.warmup-card .ex-note{border-left-color:#fbbf24;}
+.ex-card.warmup-card .inp-field:focus{border-color:#fbbf24;}
+.ex-card.warmup-card.all-logged{border-color:rgba(251,191,36,.35);}
+.superset-label{font-size:10px;font-weight:500;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin:10px 0 4px 2px;display:flex;align-items:center;gap:6px;}
+.superset-label::after{content:'';flex:1;height:0.5px;background:var(--border2);}
+
+/* ── Exercise card ── */
+.ex-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;width:100%;transition:border-color .15s;}
+.ex-card.all-logged{border-color:rgba(34,197,94,.28);}
+.ex-card.core-card{border-color:rgba(34,197,94,.12);}
+.ex-card.core-card.all-logged{border-color:rgba(34,197,94,.4);}
+
+/* ── Exercise header ── */
+.ex-header{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 14px 10px;gap:10px;}
+.ex-info{flex:1;min-width:0;}
+.ex-name{font-size:14px;font-weight:500;line-height:1.3;margin-bottom:2px;}
+.ex-meta{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.ex-check{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .2s;}
+.ex-card.all-logged .ex-check{background:var(--green);border-color:var(--green);}
+.check-icon{width:13px;height:13px;stroke:var(--muted);}
+.ex-card.all-logged .check-icon{stroke:#fff;}
+
+/* ── Column headers ── */
+.set-col-headers{display:grid;grid-template-columns:28px 1fr 1fr 1fr;gap:6px;padding:0 14px 6px;align-items:center;}
+.set-col-hdr{font-size:10px;font-weight:500;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.07em;text-align:center;}
+.set-col-hdr.left{text-align:left;}
+
+/* ── Set rows ── */
+.set-rows{padding:0 14px 4px;}
+.set-row{display:grid;grid-template-columns:28px 1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:6px;}
+.set-num{font-size:12px;font-weight:600;color:var(--muted);font-family:'DM Mono',monospace;text-align:center;line-height:1;}
+.set-row.set-logged .set-num{color:var(--green);}
+
+.inp-field{background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:9px 8px;font-size:15px;font-weight:500;color:var(--text);font-family:'DM Mono',monospace;width:100%;outline:none;-webkit-appearance:none;transition:border-color .15s;text-align:center;}
+.inp-field:focus{border-color:var(--orange);}
+.inp-field::placeholder{color:rgba(255,255,255,.15);font-weight:400;font-size:13px;}
+.ex-card.core-card .inp-field:focus{border-color:var(--green);}
+
+/* ── Last week cell ── */
+.last-cell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
+.last-val{font-size:11px;font-weight:500;color:var(--orange);font-family:'DM Mono',monospace;line-height:1.2;text-align:center;}
+.last-lbl{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1;}
+.last-empty{font-size:11px;color:rgba(255,255,255,.1);text-align:center;}
+
+/* ── Coaching note ── */
+.ex-note{margin:4px 14px 12px;font-size:12px;color:var(--muted);line-height:1.5;padding:9px 11px;background:var(--bg3);border-radius:var(--radius-sm);border-left:2px solid var(--orange);}
+.ex-card.core-card .ex-note{border-left-color:var(--green);}
+
+/* ── Finisher ── */
+.finisher{background:linear-gradient(135deg,rgba(232,96,27,.08),rgba(232,96,27,.02));border:0.5px solid rgba(232,96,27,.2);border-radius:var(--radius);padding:14px 16px;margin-top:6px;width:100%;}
+.finisher-lbl{font-size:10px;font-weight:600;color:var(--orange);text-transform:uppercase;letter-spacing:.1em;font-family:'DM Mono',monospace;margin-bottom:5px;}
+.finisher-txt{font-size:13px;color:var(--text);line-height:1.55;}
+
+/* ── Rest screen ── */
+.rest-screen{display:flex;flex-direction:column;align-items:center;padding:50px 16px 20px;text-align:center;width:100%;}
+.rest-icon{width:60px;height:60px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+.rest-icon svg{width:26px;height:26px;stroke:var(--muted);}
+.rest-title{font-size:20px;font-weight:600;margin-bottom:6px;}
+.rest-sub{font-size:13px;color:var(--muted);line-height:1.6;max-width:280px;}
+.rest-tips{margin-top:20px;width:100%;max-width:360px;}
+.rest-tip{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;text-align:left;font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:7px;display:flex;align-items:flex-start;gap:9px;}
+.rest-dot{width:5px;height:5px;border-radius:50%;background:var(--orange);flex-shrink:0;margin-top:5px;}
+
+/* ── History ── */
+.history-toggle{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px;margin-top:4px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;}
+.history-panel{display:none;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-top:8px;overflow:hidden;}
+.history-panel.open{display:block;}
+.history-entry{padding:11px 14px;border-bottom:0.5px solid var(--border);}
+.history-entry:last-child{border-bottom:none;}
+.h-date{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:6px;}
+.h-ex-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:3px;}
+.h-set-row{display:flex;gap:8px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;padding:1px 0;}
+.h-set-num{color:var(--muted);width:40px;flex-shrink:0;}
+.h-set-val{color:var(--text);}
+.h-ex-block{margin-bottom:8px;}
+.h-ex-block:last-child{margin-bottom:0;}
+
+/* ── Save bar ── */
+.save-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:0.5px solid var(--border);padding:10px 16px 16px;display:none;gap:9px;z-index:20;}
+.save-bar.visible{display:flex;}
+.save-btn{flex:1;background:var(--orange);color:#fff;border:none;border-radius:var(--radius-sm);padding:14px;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
+.save-btn:active{opacity:.8;}
+.clear-btn{background:var(--bg2);color:var(--muted);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:14px 16px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;}
+.clear-btn:active{opacity:.7;}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--bg3);border:0.5px solid var(--border2);border-radius:100px;padding:9px 16px;font-size:13px;font-weight:500;opacity:0;transition:all .2s;pointer-events:none;white-space:nowrap;z-index:100;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.success{border-color:rgba(34,197,94,.3);color:var(--green);}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.ex-card{animation:fadeUp .18s ease both;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">LIFT<span>.</span>LOG</div>
+  <button class="export-btn" onclick="exportExcel()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export
+  </button>
+</div>
+
+<div class="day-bar-wrap">
+  <div class="day-bar" id="dayBar"></div>
+</div>
+
+<div class="content" id="content"></div>
+
+<div class="save-bar" id="saveBar">
+  <button class="clear-btn" onclick="clearDay()">Clear</button>
+  <button class="save-btn" onclick="saveDay()">Save workout</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Plan ─────────────────────────────────────────────────────────────────────
+// numSets drives how many input rows render per exercise
+const PLAN = [
+  {
+    id:0, day:"Mon", name:"Push A", tag:"Chest · Shoulders · Triceps · Core",
+    color:"#e8601b", isRest:false,
+    sections:[
+      { type:"warmup", label:"Mobility Warm-Up", exercises:[
+        { name:"Hip 90/90 Stretch",          numSets:1, reps:"60 sec ea side",  note:"Sit on floor, both legs at 90°. Hold front shin down, rotate to back leg. Opens hip rotators — reduces lower back tightness." },
+        { name:"World's Greatest Stretch",   numSets:1, reps:"5 ea side",       note:"Lunge forward, place same-side hand inside foot, rotate top arm to sky. Hits hip flexor, thoracic spine, and hamstring in one movement." },
+        { name:"Thoracic Rotation (kneeling)",numSets:1,reps:"10 ea side",      note:"Kneel, hand behind head, rotate elbow toward ceiling. Unlocks upper back rotation — the biggest physical limiter in golf." },
+        { name:"Glute Bridge",               numSets:1, reps:"15",              note:"Activates glutes before lifting. Prevents lower back from compensating on deadlifts, rows, and squats." },
+        { name:"Arm Circles / Band Pull-Apart",numSets:1,reps:"15",             note:"Warms up shoulder joint before pressing. Can use a resistance band or just arm circles if no band available." },
+      ]},
+      { type:"lifts", label:"Compound Lifts", exercises:[
+        { name:"Barbell Bench Press",     numSets:4, reps:"5–6",      note:"Primary strength movement. 180 lb baseline. Add 5 lb when all 4 sets hit 6 clean reps. Full rest 2–3 min." },
+      ]},
+      { type:"superset", label:"Superset 1", exercises:[
+        { name:"DB Shoulder Press",       numSets:3, reps:"10–12",    note:"Seated or standing. Full range of motion.", isCore:false },
+        { name:"Cable Crunch",            numSets:3, reps:"15",       note:"Kneel facing pulley. Crunch elbows to knees. Initiate with abs not arms. 60 sec rest after pair.", isCore:true },
+      ]},
+      { type:"superset", label:"Superset 2", exercises:[
+        { name:"DB Lateral Raise",        numSets:3, reps:"12–15",    note:"Strict form. No swinging. Pause at top.", isCore:false },
+        { name:"Plank",                   numSets:3, reps:"45 sec",   note:"Elbows under shoulders. Squeeze glutes and abs. Don't let hips sag. 60 sec rest after pair.", isCore:true, noWeight:true, timeOnly:true },
+      ]},
+      { type:"superset", label:"Superset 3", exercises:[
+        { name:"Tricep Pushdowns",        numSets:3, reps:"12–15",    note:"Elbows pinned to sides. Squeeze at full extension.", isCore:false },
+        { name:"Dead Bug",                numSets:3, reps:"10 ea",    note:"Lower back stays pressed to floor. Slow and controlled. 60 sec rest after pair.", isCore:true, noWeight:true },
+      ]},
+    ],
+    finisher:"Treadmill incline walk — Incline 6–8 · Speed 3.0–3.5 mph · 15 min · Zone 2"
+  },
+  {
+    id:1, day:"Tue", name:"Pull A + DL", tag:"Back · Biceps · Deadlift · Core",
+    color:"#3b82f6", isRest:false,
+    sections:[
+      { type:"warmup", label:"Mobility Warm-Up", exercises:[
+        { name:"Hip 90/90 Stretch",          numSets:1, reps:"60 sec ea side",  note:"Sit on floor, both legs at 90°. Hold front shin down, rotate to back leg. Opens hip rotators — reduces lower back tightness." },
+        { name:"World's Greatest Stretch",   numSets:1, reps:"5 ea side",       note:"Lunge forward, place same-side hand inside foot, rotate top arm to sky. Hits hip flexor, thoracic spine, and hamstring in one movement." },
+        { name:"Thoracic Rotation (kneeling)",numSets:1,reps:"10 ea side",      note:"Kneel, hand behind head, rotate elbow toward ceiling. Unlocks upper back rotation — the biggest physical limiter in golf." },
+        { name:"Glute Bridge",               numSets:1, reps:"15",              note:"Activates glutes before lifting. Prevents lower back from compensating on deadlifts, rows, and squats." },
+        { name:"Arm Circles / Band Pull-Apart",numSets:1,reps:"15",             note:"Warms up shoulder joint before pressing. Can use a resistance band or just arm circles if no band available." },
+      ]},
+      { type:"lifts", label:"Compound Lifts", exercises:[
+        { name:"Barbell Deadlift",        numSets:4, reps:"5",        note:"Anchor lift of the week. 180 lb baseline. Add 5 lb when all sets feel smooth. Full rest 3 min." },
+        { name:"Barbell Bent-Over Row",   numSets:4, reps:"6–8",      note:"Overhand grip. Hinge to ~45°. Squeeze shoulder blades at top. Full rest 2 min." },
+      ]},
+      { type:"superset", label:"Superset 1", exercises:[
+        { name:"DB Single-Arm Row",       numSets:3, reps:"10–12 ea", note:"Full range — arm extended at bottom, elbow past torso at top.", isCore:false },
+        { name:"Pallof Press",            numSets:3, reps:"10 ea",    note:"Stand sideways to pulley. Press out, hold 2 sec, return. Abs resist rotation. 60 sec rest after pair.", isCore:true },
+      ]},
+      { type:"superset", label:"Superset 2", exercises:[
+        { name:"Pulley Lat Pulldown",     numSets:3, reps:"10–12",    note:"Wide grip. Drive elbows to hips.", isCore:false },
+        { name:"Ab Wheel Rollout",        numSets:3, reps:"8–10",     note:"Roll out until hips about to drop, pull back with abs. 60 sec rest after pair.", isCore:true, noWeight:true },
+      ]},
+      { type:"superset", label:"Superset 3", exercises:[
+        { name:"DB Hammer Curl",          numSets:3, reps:"12–15",    note:"Neutral grip. 2 sec negative. No swinging.", isCore:false },
+        { name:"Side Plank",              numSets:3, reps:"30 sec ea", note:"Keep hips raised throughout. 60 sec rest after pair.", isCore:true, noWeight:true, timeOnly:true },
+      ]},
+    ],
+    finisher:"Treadmill incline walk — Incline 6–8 · Speed 3.0–3.5 mph · 15 min"
+  },
+  {
+    id:2, day:"Wed", name:"Conditioning", tag:"HIIT or KB Circuit",
+    color:"#ef4444", isRest:false,
+    sections:[
+      { type:"lifts", label:"Pick One Option", exercises:[
+        { name:"Option A: Treadmill HIIT",        numSets:8, reps:"30s sprint / 90s walk", note:"5 min warm-up → 8 rounds → 5 min cool-down. Total ~25 min." },
+        { name:"Option B: KB Swing (50 lb)",      numSets:4, reps:"45 sec",  note:"Hip hinge driven. Explosive. Squeeze glutes at top." },
+        { name:"Option B: KB Clean (35 lb)",      numSets:4, reps:"45 sec",  note:"Smooth pull, soft catch in rack position." },
+        { name:"Option B: KB Press (35 lb)",      numSets:4, reps:"45 sec alt", note:"Alternate arms. Brace core. Clean to rack before pressing." },
+        { name:"Option B: KB Goblet Squat (50lb)",numSets:4, reps:"45 sec",  note:"Full depth. Pause at bottom. Drive through heels." },
+        { name:"Option B: Burpee",                numSets:4, reps:"45 sec",  note:"Chest to floor, explosive jump. 2 min rest between rounds." },
+      ]},
+    ],
+    finisher:"15 sec rest between movements · 2 min rest between rounds · Start with 3 rounds"
+  },
+  {
+    id:3, day:"Thu", name:"Push B", tag:"Chest · Shoulders · Triceps · Core",
+    color:"#e8601b", isRest:false,
+    sections:[
+      { type:"warmup", label:"Mobility Warm-Up", exercises:[
+        { name:"Hip 90/90 Stretch",          numSets:1, reps:"60 sec ea side",  note:"Sit on floor, both legs at 90°. Hold front shin down, rotate to back leg. Opens hip rotators — reduces lower back tightness." },
+        { name:"World's Greatest Stretch",   numSets:1, reps:"5 ea side",       note:"Lunge forward, place same-side hand inside foot, rotate top arm to sky. Hits hip flexor, thoracic spine, and hamstring in one movement." },
+        { name:"Thoracic Rotation (kneeling)",numSets:1,reps:"10 ea side",      note:"Kneel, hand behind head, rotate elbow toward ceiling. Unlocks upper back rotation — the biggest physical limiter in golf." },
+        { name:"Glute Bridge",               numSets:1, reps:"15",              note:"Activates glutes before lifting. Prevents lower back from compensating on deadlifts, rows, and squats." },
+        { name:"Arm Circles / Band Pull-Apart",numSets:1,reps:"15",             note:"Warms up shoulder joint before pressing. Can use a resistance band or just arm circles if no band available." },
+      ]},
+      { type:"lifts", label:"Compound Lifts", exercises:[
+        { name:"DB Bench Press",          numSets:4, reps:"8–10",     note:"3 sec negative, explosive up. Full rest 90 sec." },
+        { name:"Arnold Press",            numSets:3, reps:"10–12",    note:"Start palms facing you, rotate out as you press. Full shoulder recruitment. Full rest 90 sec." },
+      ]},
+      { type:"superset", label:"Superset 1", exercises:[
+        { name:"DB Incline Lateral Raise",numSets:3, reps:"12–15",    note:"Lie on incline bench, raise arms to sides. Hits rear and lateral delts differently.", isCore:false },
+        { name:"Ab Wheel Rollout",        numSets:3, reps:"8–10",     note:"Reduce range of motion if lower back lifts off the floor. 60 sec rest after pair.", isCore:true, noWeight:true },
+      ]},
+      { type:"superset", label:"Superset 2", exercises:[
+        { name:"Overhead Tricep Extension",numSets:3,reps:"12–15",    note:"Keep elbows pointed forward — don't let them flare.", isCore:false },
+        { name:"Cable Woodchop",           numSets:3, reps:"12 ea side", note:"High-to-low rotation. Stand sideways to pulley, rotate through hips and core — not just arms. Best golf-specific exercise in the program. 60 sec rest after pair.", isCore:true },
+      ]},
+    ],
+    finisher:"Treadmill incline walk — Incline 6–8 · Speed 3.0–3.5 mph · 15 min · Zone 2"
+  },
+  {
+    id:4, day:"Fri", name:"Pull B", tag:"Back · Biceps · Rear Delts · Core",
+    color:"#3b82f6", isRest:false,
+    sections:[
+      { type:"warmup", label:"Mobility Warm-Up", exercises:[
+        { name:"Hip 90/90 Stretch",          numSets:1, reps:"60 sec ea side",  note:"Sit on floor, both legs at 90°. Hold front shin down, rotate to back leg. Opens hip rotators — reduces lower back tightness." },
+        { name:"World's Greatest Stretch",   numSets:1, reps:"5 ea side",       note:"Lunge forward, place same-side hand inside foot, rotate top arm to sky. Hits hip flexor, thoracic spine, and hamstring in one movement." },
+        { name:"Thoracic Rotation (kneeling)",numSets:1,reps:"10 ea side",      note:"Kneel, hand behind head, rotate elbow toward ceiling. Unlocks upper back rotation — the biggest physical limiter in golf." },
+        { name:"Glute Bridge",               numSets:1, reps:"15",              note:"Activates glutes before lifting. Prevents lower back from compensating on deadlifts, rows, and squats." },
+        { name:"Arm Circles / Band Pull-Apart",numSets:1,reps:"15",             note:"Warms up shoulder joint before pressing. Can use a resistance band or just arm circles if no band available." },
+      ]},
+      { type:"lifts", label:"Compound Lifts", exercises:[
+        { name:"Pulley Lat Pulldown",     numSets:4, reps:"10–12",    note:"Wide grip. Drive elbows to hips. Full rest 90 sec." },
+        { name:"DB Single-Arm Row",       numSets:3, reps:"10–12 ea", note:"Go heavier than Tuesday if possible. Full rest 90 sec." },
+      ]},
+      { type:"superset", label:"Superset 1", exercises:[
+        { name:"Pulley Face Pull",        numSets:3, reps:"15",       note:"Rope attachment. Pull to forehead, elbows high. Non-negotiable for shoulder health.", isCore:false },
+        { name:"Cable Crunch",            numSets:3, reps:"15",       note:"Add weight vs Monday if it felt easy. 60 sec rest after pair.", isCore:true },
+      ]},
+      { type:"superset", label:"Superset 2", exercises:[
+        { name:"Pulley Rear Delt Fly",    numSets:3, reps:"15",       note:"Low pulley, bent over, arms out wide. Targets rear delts.", isCore:false },
+        { name:"Side Plank",              numSets:3, reps:"30–45 sec ea", note:"Progress time from Tuesday. 60 sec rest after pair.", isCore:true, noWeight:true, timeOnly:true },
+      ]},
+      { type:"superset", label:"Superset 3", exercises:[
+        { name:"DB Curl",                 numSets:3, reps:"12–15",    note:"Supinate as you curl. Full range.", isCore:false },
+        { name:"Dead Bug",                numSets:3, reps:"10 ea",    note:"Lower back pressed to floor the entire time. 60 sec rest after pair.", isCore:true, noWeight:true },
+      ]},
+    ],
+    finisher:"Treadmill incline walk — Incline 6–8 · Speed 3.0–3.5 mph · 15 min"
+  },
+  {
+    id:5, day:"Sat", name:"Rest", tag:"Recovery day", color:"#555", isRest:true,
+    restTips:["Hit your protein target (200g). Rest days are not cheat days.","Hydrate — aim for 110 oz of water.","Sleep 7–9 hours. This is when your body changes.","Export your workout logs. Don't lose the week."]
+  },
+  {
+    id:6, day:"Sun", name:"Rest", tag:"Recovery day", color:"#555", isRest:true,
+    restTips:["Pre-log tomorrow's food tonight. Make decisions in advance.","Review the week — Push A, Pull A+DL, Conditioning, Push B, Pull B.","Check your deficit. Tracking toward 1.7 lbs/week?","Meal prep for the week ahead if you can."]
+  }
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+// session key: "dayId_secIdx_exIdx_setIdx" → { reps, weight }
+let session = {};
+
+function sk(d,s,e,set){ return `${d}_${s}_${e}_${set}`; }
+
+function loadSession(){
+  try{ const d=localStorage.getItem('ll_v4_session'); if(d) session=JSON.parse(d); }catch(e){}
+}
+function saveSession(){
+  try{ localStorage.setItem('ll_v4_session',JSON.stringify(session)); }catch(e){}
+}
+function getHistory(dayId){
+  try{ return JSON.parse(localStorage.getItem(`ll_v4_hist_${dayId}`))||[]; }catch(e){ return []; }
+}
+function pushHistory(dayId, entry){
+  const h=getHistory(dayId); h.unshift(entry);
+  if(h.length>12) h.pop();
+  try{ localStorage.setItem(`ll_v4_hist_${dayId}`,JSON.stringify(h)); }catch(e){}
+}
+function lastSession(dayId){ const h=getHistory(dayId); return h[0]||null; }
+function lastSetsForEx(dayId, exName){
+  const last=lastSession(dayId); if(!last) return null;
+  const found=last.exercises.find(e=>e.name===exName);
+  return found ? found.sets : null;
+}
+
+loadSession();
+
+// ── Day ───────────────────────────────────────────────────────────────────────
+let currentDay = (()=>{ const d=new Date().getDay(); return d===0?6:d-1; })();
+
+function renderBar(){
+  document.getElementById('dayBar').innerHTML=PLAN.map(d=>`
+    <div class="day-pill ${d.isRest?'rest-day':''} ${d.id===currentDay?'active':''}" onclick="selectDay(${d.id})">
+      <span class="dp-label">${d.day}</span>
+      <span class="dp-name">${d.isRest?'Rest':d.name}</span>
+    </div>`).join('');
+}
+
+function selectDay(id){
+  currentDay=id; renderBar(); renderContent();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderContent(){
+  const day=PLAN[currentDay];
+  const content=document.getElementById('content');
+  const saveBar=document.getElementById('saveBar');
+
+  if(day.isRest){
+    saveBar.classList.remove('visible');
+    content.innerHTML=`
+      <div class="rest-screen">
+        <div class="rest-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </div>
+        <div class="rest-title">${day.name}</div>
+        <div class="rest-sub">Recovery is when your body actually changes — not during the workout.</div>
+        <div class="rest-tips">
+          ${day.restTips.map(t=>`<div class="rest-tip"><div class="rest-dot"></div><span>${t}</span></div>`).join('')}
+        </div>
+      </div>`;
+    return;
+  }
+
+  saveBar.classList.add('visible');
+
+  // Count completion
+  let total=0, done=0;
+  day.sections.forEach((sec,si)=>sec.exercises.forEach((ex,ei)=>{
+    for(let s=0;s<ex.numSets;s++){
+      const v=session[sk(day.id,si,ei,s)]||{};
+      total++;
+      if(v.reps||v.weight) done++;
+    }
+  }));
+  const allDone = done>=total && total>0;
+
+  let html=`
+    <div class="day-header">
+      <div class="day-title-row">
+        <div class="day-title">
+          <span class="day-accent" style="background:${day.color}"></span>${day.name}
+        </div>
+        ${allDone?`<div class="complete-badge">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Done
+        </div>`:''}
+      </div>
+      <div class="day-tag">${day.tag}</div>
+    </div>`;
+
+  day.sections.forEach((sec,si)=>{
+    // Section label
+    if(sec.type==='warmup'){
+      html+=`<div class="sec-div warmup">
+        <div class="sec-div-line"></div>
+        <div class="sec-div-label">🔥 ${sec.label} — 5 min before lifting</div>
+        <div class="sec-div-line"></div>
+      </div>`;
+    } else if(sec.type==='lifts'){
+      html+=`<div class="sec-div lifts">
+        <div class="sec-div-line"></div>
+        <div class="sec-div-label">${sec.label}</div>
+        <div class="sec-div-line"></div>
+      </div>`;
+    } else {
+      html+=`<div class="superset-label">${sec.label} — back to back</div>`;
+    }
+
+    sec.exercises.forEach((ex,ei)=>{
+      const isCore=!!ex.isCore;
+      const isWarmup=sec.type==='warmup';
+      const lastSets=lastSetsForEx(day.id,ex.name); // array of {reps,weight} or null
+
+      // Check if all sets logged
+      let exDone=true;
+      for(let s=0;s<ex.numSets;s++){
+        const v=session[sk(day.id,si,ei,s)]||{};
+        if(!v.reps&&!v.weight){ exDone=false; break; }
+      }
+
+      html+=`<div class="ex-card ${exDone?'all-logged':''} ${isCore?'core-card':''} ${isWarmup?'warmup-card':''}" id="card_${si}_${ei}" style="animation-delay:${(si*3+ei)*0.04}s">
+        <div class="ex-header">
+          <div class="ex-info">
+            <div class="ex-name">${ex.name}</div>
+            <div class="ex-meta">${ex.numSets} sets · ${ex.reps}</div>
+          </div>
+          <div class="ex-check">
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+        </div>
+
+        <!-- Column headers -->
+        <div class="set-col-headers" style="grid-template-columns:${ex.noWeight && ex.timeOnly ? '28px 1fr 1fr' : ex.noWeight ? '28px 1fr 1fr' : '28px 1fr 1fr 1fr'}">
+          <div class="set-col-hdr left">Set</div>
+          <div class="set-col-hdr">${ex.timeOnly ? 'Time' : 'Reps'}</div>
+          ${ex.noWeight ? '' : '<div class="set-col-hdr">Weight</div>'}
+          <div class="set-col-hdr">Last wk</div>
+        </div>
+
+        <!-- Set rows -->
+        <div class="set-rows">`;
+
+      for(let s=0;s<ex.numSets;s++){
+        const key=sk(day.id,si,ei,s);
+        const val=session[key]||{};
+        const setLogged=!!(val.reps||val.weight);
+
+        // Last week for this specific set
+        let lastStr='—';
+        if(lastSets && lastSets[s]){
+          const ls=lastSets[s];
+          if(!ex.noWeight && ls.weight&&ls.reps) lastStr=`${ls.weight}lb\n${ls.reps}`;
+          else if(!ex.noWeight && ls.weight)      lastStr=`${ls.weight}lb`;
+          else if(ls.reps)                        lastStr=ls.reps;
+        }
+
+        html+=`<div class="set-row ${setLogged?'set-logged':''}" id="setrow_${si}_${ei}_${s}"
+          style="grid-template-columns:${ex.noWeight ? '28px 1fr 1fr' : '28px 1fr 1fr 1fr'}">
+          <div class="set-num">${s+1}</div>
+          <input class="inp-field" type="text" inputmode="${ex.timeOnly ? 'text' : 'decimal'}"
+            placeholder="${ex.reps}"
+            value="${val.reps||''}"
+            oninput="updateSet(${day.id},${si},${ei},${s},'reps',this.value)" />
+          ${ex.noWeight ? '' : `<input class="inp-field" type="number" inputmode="decimal"
+            placeholder="lbs"
+            value="${val.weight||''}"
+            oninput="updateSet(${day.id},${si},${ei},${s},'weight',this.value)" />`}
+          <div class="last-cell">
+            ${lastStr!=='—'
+              ? lastStr.split('\n').map((l,i)=>`<div class="${i===0?'last-val':'last-lbl'}">${l}</div>`).join('')
+              : `<div class="last-empty">—</div>`}
+          </div>
+        </div>`;
+      }
+
+      html+=`</div><!-- /set-rows -->
+        <div class="ex-note">${ex.note}</div>
+      </div><!-- /ex-card -->`;
+    });
+  });
+
+  // Finisher
+  html+=`<div class="finisher">
+    <div class="finisher-lbl">Conditioning Finisher</div>
+    <div class="finisher-txt">${day.finisher}</div>
+  </div>`;
+
+  // History
+  const hist=getHistory(day.id);
+  if(hist.length>0){
+    html+=`<button class="history-toggle" onclick="toggleHist()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Previous sessions (${hist.length})
+    </button>
+    <div class="history-panel" id="histPanel">
+      ${hist.map(entry=>`
+        <div class="history-entry">
+          <div class="h-date">${entry.date}</div>
+          ${entry.exercises.map(ex=>`
+            <div class="h-ex-block">
+              <div class="h-ex-name">${ex.name}</div>
+              ${ex.sets.map((set,i)=>`
+                <div class="h-set-row">
+                  <span class="h-set-num">Set ${i+1}</span>
+                  <span class="h-set-val">${set.weight?set.weight+' lbs':''}${set.weight&&set.reps?' · ':''}${set.reps||'—'}</span>
+                </div>`).join('')}
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>`;
+  }
+
+  content.innerHTML=html;
+}
+
+// ── Input handler ─────────────────────────────────────────────────────────────
+function updateSet(dayId,si,ei,setIdx,field,value){
+  const key=sk(dayId,si,ei,setIdx);
+  if(!session[key]) session[key]={};
+  session[key][field]=value;
+  saveSession();
+
+  // Update set row highlight
+  const row=document.getElementById(`setrow_${si}_${ei}_${setIdx}`);
+  if(row){
+    const v=session[key];
+    row.classList.toggle('set-logged',!!(v.reps||v.weight));
+  }
+
+  // Update card border
+  const card=document.getElementById(`card_${si}_${ei}`);
+  if(card){
+    const day=PLAN[dayId];
+    const sec=day.sections[si]; const ex=sec.exercises[ei];
+    let allDone=true;
+    for(let s=0;s<ex.numSets;s++){
+      const v=session[sk(dayId,si,ei,s)]||{};
+      if(!v.reps&&!v.weight){ allDone=false; break; }
+    }
+    card.classList.toggle('all-logged',allDone);
+  }
+}
+
+// ── Save / Clear ──────────────────────────────────────────────────────────────
+function saveDay(){
+  const day=PLAN[currentDay]; if(day.isRest) return;
+  const exercises=[];
+  day.sections.forEach((sec,si)=>sec.exercises.forEach((ex,ei)=>{
+    const sets=[];
+    for(let s=0;s<ex.numSets;s++){
+      const v=session[sk(day.id,si,ei,s)]||{};
+      sets.push({ reps:v.reps||'', weight:v.weight||'' });
+    }
+    exercises.push({ name:ex.name, sets });
+  }));
+  pushHistory(day.id,{
+    date:new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
+    exercises
+  });
+  // Clear session for this day
+  Object.keys(session).filter(k=>k.startsWith(day.id+'_')).forEach(k=>delete session[k]);
+  saveSession();
+  showToast('Workout saved ✓','success');
+  setTimeout(()=>renderContent(),300);
+}
+
+function clearDay(){
+  const day=PLAN[currentDay];
+  Object.keys(session).filter(k=>k.startsWith(day.id+'_')).forEach(k=>delete session[k]);
+  saveSession(); renderContent(); showToast('Cleared');
+}
+
+function toggleHist(){
+  const p=document.getElementById('histPanel');
+  if(p) p.classList.toggle('open');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+type;
+  setTimeout(()=>t.className='toast '+type,2200);
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function exportExcel(){
+  const wb2=XLSX.utils.book_new();
+  PLAN.filter(d=>!d.isRest).forEach(day=>{
+    const hist=getHistory(day.id);
+    const rows=[['Exercise','Set','Target Reps','Date','Reps Logged','Weight (lbs)']];
+    if(!hist.length){
+      day.sections.forEach(sec=>sec.exercises.forEach(ex=>{
+        for(let s=0;s<ex.numSets;s++) rows.push([ex.name,`Set ${s+1}`,ex.reps,'','','']);
+      }));
+    } else {
+      hist.forEach(entry=>entry.exercises.forEach(ex=>{
+        ex.sets.forEach((set,i)=>rows.push([ex.name,`Set ${i+1}`,'',entry.date,set.reps,set.weight]));
+      }));
+    }
+    const ws2=XLSX.utils.aoa_to_sheet(rows);
+    ws2['!cols']=[{wch:26},{wch:8},{wch:14},{wch:22},{wch:13},{wch:13}];
+    XLSX.utils.book_append_sheet(wb2,ws2,day.name.substring(0,31));
+  });
+  const sumRows=[['Day','Last Logged','Sessions']];
+  PLAN.filter(d=>!d.isRest).forEach(day=>{
+    const h=getHistory(day.id);
+    sumRows.push([day.name,h.length?h[0].date:'Never',h.length]);
+  });
+  const sw=XLSX.utils.aoa_to_sheet(sumRows);
+  sw['!cols']=[{wch:22},{wch:24},{wch:12}];
+  XLSX.utils.book_append_sheet(wb2,sw,'Summary');
+  XLSX.writeFile(wb2,`LiftLog_${new Date().toISOString().split('T')[0]}.xlsx`);
+  showToast('Downloaded ✓','success');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderBar();
+renderContent();
+</script>
+</body>
+</html>
